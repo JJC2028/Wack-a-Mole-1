@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Whack-a-Mole</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green-dark: #3B6D11;
+      --green-mid: #639922;
+      --green-light: #EAF3DE;
+      --brown: #8B6A3E;
+      --brown-light: #B4956A;
+      --orange: #D85A30;
+      --orange-light: #FAECE7;
+      --cream: #FDF8F0;
+      --text: #2C2C2A;
+      --text-muted: #888780;
+      --card-bg: #FFFFFF;
+      --shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: var(--cream);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+      background-image:
+        radial-gradient(circle at 20% 20%, #C0DD9722 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, #FAC77522 0%, transparent 50%);
+    }
+
+    h1 {
+      font-family: 'Fredoka One', cursive;
+      font-size: clamp(2rem, 6vw, 3.2rem);
+      color: var(--green-dark);
+      letter-spacing: 1px;
+      margin-bottom: 0.25rem;
+      text-align: center;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      padding: 2rem;
+      width: 100%;
+      max-width: 460px;
+    }
+
+    /* Scoreboard */
+    #scoreboard {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 1.5rem;
+    }
+
+    .stat-card {
+      background: var(--cream);
+      border-radius: 14px;
+      padding: 0.6rem 0.5rem;
+      text-align: center;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+
+    .stat-val {
+      font-family: 'Fredoka One', cursive;
+      font-size: 28px;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    /* Difficulty */
+    #diff-wrap {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+
+    #diff-wrap button {
+      padding: 5px 16px;
+      border-radius: 20px;
+      border: 2px solid #D3D1C7;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: 'Nunito', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    #diff-wrap button.active {
+      border-color: var(--green-mid);
+      color: var(--green-dark);
+      background: var(--green-light);
+    }
+
+    #msg {
+      text-align: center;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+      min-height: 20px;
+    }
+
+    /* Grid */
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-bottom: 1.5rem;
+    }
+
+    .hole {
+      aspect-ratio: 1;
+      border-radius: 18px;
+      border: 2px solid #D3D1C7;
+      background: #F1EFE8;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      cursor: pointer;
+      overflow: hidden;
+      position: relative;
+      user-select: none;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .dirt {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 36%;
+      background: var(--brown-light);
+      border-top: 3px solid var(--brown);
+      z-index: 2;
+      border-radius: 0 0 16px 16px;
+    }
+
+    .mole-wrap {
+      position: absolute;
+      bottom: 30%;
+      left: 50%;
+      transform: translateX(-50%) translateY(110%);
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .mole-body {
+      font-size: 46px;
+      line-height: 1;
+      display: block;
+      transform-origin: bottom center;
+    }
+
+    .hole.up { background: #EAF3DE; border-color: #97C459; }
+    .hole.whacked { background: #FAECE7; border-color: #D85A30; }
+
+    .hole.up .mole-wrap {
+      animation: popUp 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+    .hole.going-down .mole-wrap {
+      animation: popDown 0.22s ease-in forwards;
+    }
+    .hole.whacked .mole-wrap {
+      animation: whackBounce 0.35s ease-out forwards;
+    }
+
+    @keyframes popUp {
+      0%   { transform: translateX(-50%) translateY(110%); }
+      60%  { transform: translateX(-50%) translateY(-12%); }
+      80%  { transform: translateX(-50%) translateY(4%); }
+      100% { transform: translateX(-50%) translateY(0%); }
+    }
+    @keyframes popDown {
+      0%   { transform: translateX(-50%) translateY(0%); }
+      100% { transform: translateX(-50%) translateY(120%); }
+    }
+    @keyframes whackBounce {
+      0%   { transform: translateX(-50%) translateY(0%) rotate(0deg) scale(1); }
+      20%  { transform: translateX(-60%) translateY(-8%) rotate(-18deg) scale(0.9); }
+      50%  { transform: translateX(-45%) translateY(30%) rotate(10deg) scale(0.75); }
+      100% { transform: translateX(-50%) translateY(120%) rotate(0deg) scale(0.6); }
+    }
+
+    .stars {
+      position: absolute;
+      top: 10%; left: 50%;
+      transform: translateX(-50%);
+      font-size: 18px;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 5;
+      white-space: nowrap;
+    }
+    .hole.whacked .stars {
+      animation: starsFlash 0.5s ease-out forwards;
+    }
+    @keyframes starsFlash {
+      0%   { opacity: 1; transform: translateX(-50%) scale(0.5) translateY(0px); }
+      60%  { opacity: 1; transform: translateX(-50%) scale(1.2) translateY(-14px); }
+      100% { opacity: 0; transform: translateX(-50%) scale(1) translateY(-24px); }
+    }
+
+    .score-pop {
+      position: absolute;
+      top: 8%; left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Fredoka One', cursive;
+      font-size: 18px;
+      color: var(--green-dark);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 6;
+    }
+    .hole.whacked .score-pop {
+      animation: scoreFly 0.6s ease-out forwards;
+    }
+    @keyframes scoreFly {
+      0%   { opacity: 1; transform: translateX(-50%) translateY(0px) scale(1); }
+      100% { opacity: 0; transform: translateX(-50%) translateY(-32px) scale(1.3); }
+    }
+
+    .hole.idle-wiggle .mole-body {
+      animation: idleWiggle 0.6s ease-in-out;
+    }
+    @keyframes idleWiggle {
+      0%   { transform: rotate(0deg); }
+      20%  { transform: rotate(-8deg); }
+      50%  { transform: rotate(8deg); }
+      80%  { transform: rotate(-4deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    /* Controls */
+    #controls {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    #controls button {
+      padding: 10px 28px;
+      border-radius: 50px;
+      border: none;
+      font-family: 'Fredoka One', cursive;
+      font-size: 16px;
+      cursor: pointer;
+      transition: transform 0.1s, opacity 0.15s;
+    }
+
+    #controls button:active { transform: scale(0.96); }
+    #controls button:disabled { opacity: 0.4; cursor: default; transform: none; }
+
+    #startBtn { background: var(--green-mid); color: white; }
+    #startBtn:hover:not(:disabled) { background: var(--green-dark); }
+    #stopBtn { background: var(--orange); color: white; }
+    #stopBtn:hover:not(:disabled) { background: #B8441F; }
+
+    footer {
+      margin-top: 1.5rem;
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Whack-a-Mole 🐹</h1>
+  <p class="subtitle">Built with HTML, CSS &amp; JavaScript</p>
+
+  <div class="card">
+    <div id="scoreboard">
+      <div class="stat-card"><div class="stat-label">Score</div><div class="stat-val" id="score">0</div></div>
+      <div class="stat-card"><div class="stat-label">Best</div><div class="stat-val" id="best">0</div></div>
+      <div class="stat-card"><div class="stat-label">Time</div><div class="stat-val" id="timer">30</div></div>
+      <div class="stat-card"><div class="stat-label">Misses</div><div class="stat-val" id="misses">0</div></div>
+    </div>
+
+    <div id="diff-wrap">
+      <button class="active" data-d="easy">Easy</button>
+      <button data-d="medium">Medium</button>
+      <button data-d="hard">Hard</button>
+    </div>
+
+    <p id="msg">Choose a difficulty and press Start!</p>
+
+    <div id="grid"></div>
+
+    <div id="controls">
+      <button id="startBtn">Start</button>
+      <button id="stopBtn" disabled>Stop</button>
+    </div>
+  </div>
+
+  <footer>Made by [Your Name] &mdash; <a href="https://github.com/yourname/whack-a-mole" style="color: var(--green-dark);">View on GitHub</a></footer>
+
+  <script>
+    const grid = document.getElementById('grid');
+    const scoreEl = document.getElementById('score');
+    const bestEl = document.getElementById('best');
+    const timerEl = document.getElementById('timer');
+    const missesEl = document.getElementById('misses');
+    const msgEl = document.getElementById('msg');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+
+    let holes = [];
+    for (let i = 0; i < 9; i++) {
+      const h = document.createElement('div');
+      h.className = 'hole';
+      h.innerHTML = `
+        <div class="stars">&#10022;&#10022;&#10022;</div>
+        <div class="score-pop">+1</div>
+        <div class="mole-wrap"><span class="mole-body">&#128057;</span></div>
+        <div class="dirt"></div>
+      `;
+      grid.appendChild(h);
+      holes.push(h);
+    }
+
+    let score = 0, best = 0, misses = 0, timeLeft = 30;
+    let moleTimer = null, countdownTimer = null, wiggleTimer = null;
+    let activeHole = null, running = false;
+
+    const diffSettings = {
+      easy:   { up: 1100, down: 900 },
+      medium: { up: 750,  down: 600 },
+      hard:   { up: 450,  down: 380 }
+    };
+    let diff = 'easy';
+
+    document.querySelectorAll('#diff-wrap button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (running) return;
+        document.querySelectorAll('#diff-wrap button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        diff = btn.dataset.d;
+      });
+    });
+
+    function clearHole(h, animate) {
+      if (!h) return;
+      if (animate && h.classList.contains('up')) {
+        h.classList.remove('up');
+        h.classList.add('going-down');
+        setTimeout(() => h.classList.remove('going-down'), 250);
+      } else {
+        h.classList.remove('up', 'going-down', 'whacked');
+      }
+    }
+
+    function triggerWiggle(h) {
+      if (!h.classList.contains('up')) return;
+      const body = h.querySelector('.mole-body');
+      body.classList.remove('idle-wiggle');
+      void body.offsetWidth;
+      body.classList.add('idle-wiggle');
+      setTimeout(() => body.classList.remove('idle-wiggle'), 650);
+    }
+
+    function popMole() {
+      if (!running) return;
+      if (activeHole) clearHole(activeHole, true);
+      const available = holes.filter(h => !h.classList.contains('up') && !h.classList.contains('going-down'));
+      const h = available[Math.floor(Math.random() * available.length)];
+      if (!h) { moleTimer = setTimeout(popMole, 200); return; }
+      h.classList.add('up');
+      activeHole = h;
+      const s = diffSettings[diff];
+      const stayTime = s.up + Math.random() * 300;
+
+      clearTimeout(wiggleTimer);
+      wiggleTimer = setTimeout(() => triggerWiggle(h), stayTime * 0.5);
+
+      moleTimer = setTimeout(() => {
+        if (h.classList.contains('up') && !h.classList.contains('whacked')) {
+          clearHole(h, true);
+          if (activeHole === h) activeHole = null;
+        }
+        if (running) moleTimer = setTimeout(popMole, s.down);
+      }, stayTime);
+    }
+
+    holes.forEach(h => {
+      h.addEventListener('click', () => {
+        if (!running) return;
+        if (!h.classList.contains('up') || h.classList.contains('whacked')) {
+          if (!h.classList.contains('up')) { misses++; missesEl.textContent = misses; }
+          return;
+        }
+        clearTimeout(moleTimer);
+        clearTimeout(wiggleTimer);
+        h.classList.remove('up', 'going-down');
+        h.classList.add('whacked');
+        score++;
+        scoreEl.textContent = score;
+        if (activeHole === h) activeHole = null;
+        setTimeout(() => {
+          h.classList.remove('whacked');
+          if (running) {
+            const s = diffSettings[diff];
+            moleTimer = setTimeout(popMole, s.down * 0.5);
+          }
+        }, 400);
+      });
+    });
+
+    function startGame() {
+      score = 0; misses = 0; timeLeft = 30;
+      scoreEl.textContent = 0;
+      missesEl.textContent = 0;
+      timerEl.textContent = 30;
+      holes.forEach(h => h.classList.remove('up', 'going-down', 'whacked'));
+      running = true;
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+      document.querySelectorAll('#diff-wrap button').forEach(b => b.disabled = true);
+      msgEl.textContent = 'Whack those moles!';
+      popMole();
+      countdownTimer = setInterval(() => {
+        timeLeft--;
+        timerEl.textContent = timeLeft;
+        if (timeLeft <= 0) endGame();
+      }, 1000);
+    }
+
+    function endGame() {
+      running = false;
+      clearTimeout(moleTimer);
+      clearTimeout(wiggleTimer);
+      clearInterval(countdownTimer);
+      holes.forEach(h => clearHole(h, true));
+      activeHole = null;
+      if (score > best) { best = score; bestEl.textContent = best; }
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      document.querySelectorAll('#diff-wrap button').forEach(b => b.disabled = false);
+      msgEl.textContent = 'Game over! Score: ' + score + (score === best && score > 0 ? ' — New best!' : '');
+    }
+
+    startBtn.addEventListener('click', startGame);
+    stopBtn.addEventListener('click', endGame);
+  </script>
+</body>
+</html>
